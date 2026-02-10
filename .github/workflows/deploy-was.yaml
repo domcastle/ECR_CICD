@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: team1-was
+  namespace: my-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: team1-was
+  template:
+    metadata:
+      labels:
+        app: team1-was
+    spec:
+      containers:
+      - name: team1-was
+        # [수정 필요] AWS ECR에 'team1-was' 리포지토리 생성 후 주소 입력
+        image: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/team1-was:latest
+        ports:
+        - containerPort: 8000
+        env:
+        # [Secret] 민감 정보 (AWS 키, DB 비번 등)
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: app-secret, key: AWS_ACCESS_KEY_ID } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: app-secret, key: AWS_SECRET_ACCESS_KEY } }
+        - name: DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: app-secret, key: DB_PASSWORD } }
+        # [Config] 일반 설정
+        - name: DB_HOST
+          value: "postgres-service"  # DB 서비스 이름
+        - name: REDIS_HOST
+          value: "redis-service"     # Redis 서비스 이름
+        - name: AWS_REGION
+          value: "ap-northeast-2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: team1-was-service
+  namespace: my-project
+spec:
+  selector:
+    app: team1-was
+  ports:
+    - protocol: TCP
+      port: 80        # 서비스 포트
+      targetPort: 8000 # 컨테이너 포트
+  type: ClusterIP

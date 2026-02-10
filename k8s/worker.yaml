@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: team1-worker       # [변경] 이름을 ai-worker -> team1-worker로 통일
+  namespace: my-project    # 본인의 프로젝트 이름
+  labels:
+    app: team1-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: team1-worker
+  template:
+    metadata:
+      labels:
+        app: team1-worker
+    spec:
+      containers:
+      - name: team1-worker
+        # [핵심 수정 1] 리포지토리 이름을 'team1-worker'로 변경해야 합니다!
+        # (GitHub Actions가 이 주소를 보고 새 버전으로 바꿔줍니다)
+        image: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/team1-worker:latest
+        
+        # [추가] AI 작업은 무거우므로 리소스 제한을 두는 것이 좋습니다 (ROSA 권장)
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+        env:
+        # [핵심 수정 2] Secret 이름을 'app-secret' 하나로 통합했으므로 변경
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secret    # aws-secret -> app-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secret    # aws-secret -> app-secret
+              key: AWS_SECRET_ACCESS_KEY
+        
+        # [일반 설정] ConfigMap을 써도 되지만, 헷갈리면 직접 입력해도 됩니다.
+        - name: AWS_REGION
+          value: "ap-northeast-2"
+        - name: AWS_S3_BUCKET
+          value: "team1-video-storage" # 본인의 S3 버킷 이름 확인!
+        - name: REDIS_HOST
+          value: "redis-service"       # Redis 서비스 이름 (또는 IP)
+        
+        # 스크립트 경로 (Dockerfile 설정과 일치시킴)
+        - name: FFMPEG_SCRIPT
+          value: "/opt/ai/scripts/run_ffmpeg_shorts.sh"
+        - name: CAPTION_SCRIPT
+          value: "/opt/ai/worker/generate_caption.py"
